@@ -31,3 +31,74 @@ O_EXCL是个原子操作，把测试文件是否存在，创建文件合成为�
   *O_RSYNC
   *O_SYNC
 O_DSYNC是真正的write I/O完成之后再返回，但是并不关心文件的属性是否更新，O_RSYNC是让正在等待操作同一区域的write先完成操作再读。就是同时读写同一区域时先写后读。O_SYNC和O_DSYNC比较像，但是它是等write I/O完成，并且更新完文件属性之后才返回，Linux不区分这三个选项，都当成O_SYNC来处理。
+====creat函数====
+creat的函数原型:
+<code c>
+#include <fcntl.h>
+int creat(const char* pathname,int mode);
+</code>
+creat创建的文件是write only，它相当于
+<code c>
+open(path,O_WRONLY|O_CREAT|O_TRUNC,mode);
+</code>
+但是之前open的功能没有这么强大，所以有了creat.
+====close函数====
+close函数的原型：
+<code c>
+int close(int filedesc);
+//0 means OK, -1 means 错误
+</code>
+进程结束之后，它所打开的文件描述符都会被kernel关闭.
+==== lseek函数====
+lseek函数原型:
+<code c>
+#include <unistd.h>
+off_t lseek(int filedes,off_t offset,int whence);
+</code>
+off_t这个类型是long int，带符号数。whence的可先值有三个SEEK_SET,SEEK_CUR,SEEK_END。返回值是当前光标点离文件起始位置的字节数，利用这个特性我们可以用SEEK_END来计算文件的大小。
+<code c>
+int filesize = lseek(fd,0,SEEK_END);
+</code>
+我们也可以在文件中补个洞，并在洞后面添加数据。因为lseek偏移的值可以比文件还要大，过界都可以。
+<code c>
+int fd = open(file,O_RDWR|O_SYNC);
+lseek(fd,10,SEEK_END);
+write(fd,"xxx",3);
+</code>
+这样就可以在文件后面留10个字节的空白，这些空白如果读出来就是0。
+<code c hole.c>
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+int
+main (void)
+{
+  int fd;
+  int ret;
+  if ((fd = open ("x.txt", O_WRONLY | O_SYNC | O_NOCTTY | O_NONBLOCK)) < 0)
+    {
+      printf ("open file x.txt fail.\n");
+      return -1;
+    }
+  if ((ret = lseek (fd, 4, SEEK_END)) == -1)
+    {
+      printf ("lseek error.\n");
+      close (fd);
+      exit (127);
+    }
+  if ((ret = write (fd, "xxx", 3)) != 3)
+    {
+      printf ("write chars faile\n");
+      close (fd);
+      exit (127);
+    }
+  printf ("fd = %d\n", fd);
+  close (fd);
+  return 0;
+}
+</code>
+PIPE,FIFO,socket这些都是不可以用lseek的，我们可以通过lseek(fd,0,CUR)来测试fd表示的是什么。
+
