@@ -121,3 +121,40 @@ write函数的原型:
 ssize_t write(int filedes,void* buf,size_t count);
 </code>
 返回写入的字节数或者-1，－1就是错了，原因有多种，比如文件大小限制。
+====文件的数据结构====
+每一个进程在kernel中都维护着一个TABLE，我们打开的文件描述符也在这个表中描述，它是一个指针，指向file table，file table中保存着文件的是status flag,current file offset，还有一个指针，指向v-node结构.v-node结构中保存着v-node的信息,i-node的信息，还有文件的大小。如果有两个进程打开了同一个文件，这两个进程都会拥有一个file table。但是他们共用同一个v-node结构。这时候读文件没有问题，因为文件的offset是分别存大的，但是写文件就会有问题，只有一种情况是例外，但是条件还是比较苛刻，两个进程打开同一个文件的时候必须都有一个参数O_APPEND,使用lseek到文件末尾都不行。末完待续！
+====原子操作====
+只在open函数的O_EXCL参数时提到过原子操作。现在再添加两个原子操作pread和pwrite
+<code c>
+#include <unistd.h>
+ssize_t pread(int filesdes,void* buffer,size_t nbytes,off_t offset);
+</code>
+返回值大于零表示读取到的字节数，－1就错了
+<code c>
+#include<unistd.h>
+ssize_t pwrite(int filedes,void* buffer,size_t nbytes,off_t offset);
+</code>
+这两个函数都是把lseek操作和read/write操作合并在一起，中间不会被打断的哟！不过这两条我不理解：
+  *There is no way to interrupt the two operations using pread.
+  *The file pointer is not updated.
+====dup & dup2函数====
+这两个函数的原理是：
+<code c>
+#include<unistd.h>
+int dup(int filedes);
+int dup2(int filedes,int filedes2);
+</code>
+执行成功返回描述符，失败返回-1 \\
+dup2如果filedes2已经打开，它装被关闭然后再被打开，这个过程是原子操作。虽然我知道这两个函数是什么意思，但是我想不明白它们有什么用，等等看吧。或许以后会理解的。忘记一点最重要的，dup/dup2返回的描述符和filedes共用同一个file table，read和write的时候不会有冲突覆盖的问题了，不过也仅限于同一个进程中，fork之后两个进程也可以用，哦可能就是这个意思吧。话说后面还有一个fcntl函数也包含了dup的功能。
+====sync fsync fdatasync====
+我们通常写文件的时候内核都是弄块内存把数据缓存下来，并不急于写到硬盘上，除非是那个内存它有其它用处的时候才会把数据写到硬盘上，如果我们需要保持数据缓存和原文件内容的统一就必须自己调用函数让内核把数据更新一下。通常的实现有三种:
+<code c>
+#include <unistd.h>
+int fsync(int filedes);
+int fdatasync(int filedes);
+//0 is OK -1 on error
+void sync(void);
+</code>
+sync没有参数它就是通知系统把缓冲区的数据更新一下，并不等更新开始就返回了。所以一般在demo程序中隔断时间调用一下。一般是30s。 \\
+fsync则是针对某一个文件通知系统更新缓冲的数据，并且要等更新完成才返回。fdatasync与fsync相似，不同的时fdatasync不要求系统更新文件属性，只要把数据块写回硬盘就中((Mac OS,FreeBSD不支持这个函数))
+
