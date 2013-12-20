@@ -1,0 +1,33 @@
+======File I/O ======
+=====总述=====
+在UNIX上有五个函数常用来操作文件
+  *open
+  *read
+  *write
+  *lseek
+  *close
+这里讲到的都是unbuffered I/O,就是直接调用System Call，不缓存，它不是ISO C但却是POSIX.1标准的东西。
+====open函数====
+open函数的原型是：
+<code c>
+#include <fcntl.h>
+int open(const char＊pathname,int oflag,...);
+</code>
+oflag有三个选项是三选一，必选，剩下的就是可选的。
+必先选项是
+  *O_RDONLY
+  *O_WRONLY
+  *O_RDWR
+以上三个是必选之一的，要某只读的方式打开，要某可写的方式打开，要某读写的方式打开。再看可选的选项：
+  *O_APPEND
+  *O_CREAT
+  *O_EXCL
+  *O_TRUNC
+  *O_NOCTTY
+  *O_NONBLOCK
+O_EXCL是个原子操作，把测试文件是否存在，创建文件合成为一个原子操作。如果它与O_CREAT同时存在且文件也已经存在了，它是会报错的哦！O_TRUNC是在以只写或者读写方式打开的时候才用到，它把你打开的文件清空。O_CREAT需要第三个参数来设置权限。\\
+还有三个可选的选项，与读写同步相关:
+  *O_DSYNC
+  *O_RSYNC
+  *O_SYNC
+O_DSYNC是真正的write I/O完成之后再返回，但是并不关心文件的属性是否更新，O_RSYNC是让正在等待操作同一区域的write先完成操作再读。就是同时读写同一区域时先写后读。O_SYNC和O_DSYNC比较像，但是它是等write I/O完成，并且更新完文件属性之后才返回，Linux不区分这三个选项，都当成O_SYNC来处理。
