@@ -1,0 +1,77 @@
+====进程控制====
+进程控制函数有三种，fork,exec,witpid，exec有六个变种。
+<code c v1.8.c>
+#include <stdio.h>
+#include <sys/types.h>
+
+#define MAXLINE 12
+int
+main ()
+{
+  char buf[MAXLINE];
+  pid_t pid;
+  int status;
+  printf ("%% ");
+  while (fgets (buf, MAXLINE, stdin) != NULL)
+    {
+      if (buf[strlen (buf) - 1] == '\n')
+        buf[strlen (buf) - 1] = 0;
+      if ((pid = fork ()) < 0)
+        {
+          printf ("fork error.\n");
+        }
+      else if (pid == 0)
+        {
+          execlp (buf, buf, (char *) 0);
+          printf ("couldn't execute: %s", buf);
+          exit (127);
+        }
+      if ((pid = waitpid (pid, &status, 0)) < 0)
+        printf ("waitpid error.\n");
+      printf ("%% ");
+    }
+  exit (0);
+}
+</code>
+execlp函数需要的参数是以空结尾的，所以我们要把字符串后面的'\n'换成0. \\
+fork()执行一次返回两次，返回零表示在子进程中，返回值大于0，是父进程，返回的值是子进程的ID，\\
+waitpid让进程等待而不是退出。
+Control-D, or ^D是end-of-file字符
+====线程====
+一个进程程中允许有多个线程，它们之后共享进程所有的资源，使用相同的地址空间，进程的文件描述符他们也都可以访问，栈也是如此。线程的出现较进程晚的多，所以线程的操作与进程的操作有很大的相似度。
+====error的处理====
+一个uinx进程出错的时候往往返回一个负值，并设置errno这个全局变量来表示出错的原因。有些需要返回指针的函数如果出错它们会返回一个null表示出错了，这是一个约定。 \\
+C中定义了两个函数来帮助我们打印错误信息
+<code c>
+#include <string.h>
+char* strerror(int errnum);
+</code>
+<code c>
+#include <string.h>
+void perror(const char* msg);
+</code>
+错误码可以分成两类，一类是致命的，就是没救了，只能打印一些信息然后退出。另一种是非致命的，不用退出程序，可以想办法挽救一下，这些错误类型包括
+  *EAGAIN
+  *ENFILE
+  *ENOBUFS
+  *ENOLCK
+  *ENOSPC
+  *ENOSR
+  *EWOULDBLOCK
+有时候这两种也算:
+  *ENOMEM
+  *EBUSY
+系统实在是太慢的时候这个也有可能救:
+  *EINTR
+最常用的挽救方法就是等，等一会儿再试试，这主要是针对资源短缺的情况，或者是资源竞争的情况。
+==== 系统时间====
+unix系统维护着两个时间，一个是日历时间，是我们常说的，某年某月某日X时X分X秒，这是一个值，存放的是秒数，从1979年1月1是零时零分零秒起。第二个时间就是进程时间，它的计量单位不是秒，CPU执行一条指令的时间叫一个ticks，CPU时间就是以ticks来计量的。这个时间又有三种值，
+  *Clock time
+  *User CPU time
+  *System CPU time
+执行一条指令可以看一下
+<code bash>
+cd /usr/include
+time -p grep _POSIX_SOURCE */*.h > /dev/null
+</code>
+
