@@ -101,4 +101,23 @@ main (void)
 }
 </code>
 PIPE,FIFO,socket这些都是不可以用lseek的，我们可以通过lseek(fd,0,CUR)来测试fd表示的是什么。
-
+====read函数====
+read函数的原型是:
+<code c>
+#include <unistd.h>
+ssize_t read(int filedes,void* buf,size_t count);
+</code>
+<note tip>ssize_t是有符号的，因为它可以返回0表示文件结束，－1表示出现错误，大于0表示读取到的字节数</note>
+read有很多时候并不能读取到我们指定的那么多字节:
+  *文件还剩20个字节，你要读100个
+  *读取terminal device，只能到一行结束
+  *network只缓冲那么多数据
+  *从FIFO，pipo缓冲的数据也比较少
+  *被信号中断了
+====write函数====
+write函数的原型:
+<code c>
+#include<unistd.h>
+ssize_t write(int filedes,void* buf,size_t count);
+</code>
+返回写入的字节数或者-1，－1就是错了，原因有多种，比如文件大小限制。
