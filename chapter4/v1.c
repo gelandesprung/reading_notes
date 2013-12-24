@@ -36,6 +36,8 @@ main (int argc, char *argv[])
 	printf ("socket file.\n");
       if (S_ISFIFO (mStat.st_mode))
 	printf ("PIPO file.\n");
+if(S_ISUID&mStat.st_mode)
+printf("uid is set.\n");
     }
   return 0;
 }

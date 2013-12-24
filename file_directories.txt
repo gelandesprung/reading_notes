@@ -22,4 +22,84 @@ unix中甚至允许进程间通讯使用的message quene semaphores share memory
 判断文件的类型有两种方法，一种是使用<sys/stat.h>中定义的宏S_ISREG S_ISDIR S_ISBLK S_ISCHR S_ISSOCK S_ISLNK S_ISFIFO。另一种方法是比较st_mode&S_IFMT与S_IFXXX的值，这也是S_ISXXX实现的过程，主要是因为有些老旧的系统没有添加这些宏，我们代码中就要麻烦一点啦！这两种方法都不能判断IPC对象的类型，它们有特殊的宏来判断，S_TYPEISMQ() S_TYPEISSEM() S_TYPEISSHM()这三个宏不使用stat.st_mode作为参数，而是使用&stat，也就是struct stat结构指针作为参数。 \\
 说完了这些来总结一下：判断文件的类型首先要调用stat fstat lstat三个中的一个取得struct stat结构，然后使用S_ISREG S_ISDIR S_ISBLK S_ISCHR S_ISSOCK S_ISLNK S_ISFIFO S_TYPEISMQ() S_TYPEISSEM() S_TYPEISSHM()这十个宏就可以判断文件的类型了，如果前七个宏不存在，需要使用st_mode&S_IFMT的值与S_IFXXX比较。
 
+====set-user-id set-group-id====
+在struct stat结构中st_mode有两位可以通过S_ISUID S_ISGID来检查，如果S_ISUID被设置了，那么文件在执行的时候不使用它自己的uid而是使用struct stat结构中的st_uid结的值作为它的uid。举个例子，我的一个文件被设置成uid=0,那么它个文件执行的时候就有root权限，如su。
+用法如下:
+<code c>
+if(stat.st_mode & S_ISUID) printf("uid is set.\n");
+</code>
+==== 文件的访问权限====
+在struct stat.st_mode中还定义了文件的访问权限，总共有九种:
+  * S_IRUSR
+  * S_IWUSR
+  * S_IXUSR
+  * S_IRGRP
+  * S_IWGRP
+  * S_IXGRP
+  * S_IROTH
+  * S_IWOTH
+  * S_IXOTH
+非常的容易记，分成三组usr group other，每一组都是三个权限read write exec。读权限和执行权限是不一样的，读权限是我们可以把文件的内容列举出来，而执行权限对于目录来说就是可以通过比如我要打开/home/test/hi.h，那么我必须要对/ home test三个目录有执行权限，否则过不去呀，同样如果要在一个目录中创建文件，必须对这个目录拥有写权限和执行权限。
+====新文件的权限====
+在新文件创建时候也需要一个uid和一个gid，在linux中uid是进程的effective user id，groupid就要分情况了，如果新建文件的目录设置set-group-id位，新文件的group id就和目录的一致，否则用进程的effective group id。
+====access====
+access函数原型:
+<code c>
+int access(const char* pathname,int mode);
+</code>
+返回0正确，-1错误 \\
+这个检查忽略set-user-id和set-group-id位，它直接检查进程的real user是对某一文件权限.mode有四个选择R_OK W_OK X_OK F_OK分别是可读，可写，可执行，文件存在.
+<code c>
+#include<unistd.h>
+#include<stdio.h>
+int
+main (int argc, char *argv[])
+{
+  int ret;
+
+  if (argc != 2)
+    {
+      printf ("Usage:\n\t./a.out file\n");
+      return -1;
+    }
+  if ((ret = access (argv[1], R_OK)) == -1)
+    printf ("no read priviledge.\n");
+  else
+    printf ("ok\n");
+  return 0;
+}
+</code>
+====umask====
+umask函数原型:
+<code c>
+#include <sys/stat.h>
+mode_t umask(mode_t cmask);
+</code>
+umask返回的是设置之前的mask值，mask的优先级最高，设置完mask之后就算创建文件使用的是777，创建之后的结果也只是mask的子集，看例子吧！
+<code c>
+#include <unistd.h>
+#include <sys/types.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/stat.h>
+
+#define RWRWRW (S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP|S_IROTH|S_IWOTH|S_IXOTH)
+int
+main ()
+{
+  int ret;
+  umask (0);
+  if ((ret = creat ("foo1", RWRWRW)) == -1)
+    printf ("creat file foo1 fail.\n");
+  umask (S_IRUSR | S_IRGRP | S_IROTH);
+  if ((ret = creat ("foo2", RWRWRW)) == -1)
+    printf ("creat file foo2 fail.\n");
+  return 0;
+}
+</coe>
+<code bash>
+-rwxrwxrwx 1 yanchao yanchao    0 Dec 24 15:40 foo1
+--wx-wx-wx 1 yanchao yanchao    0 Dec 24 15:40 foo2
+</code>
+从例子和结果能看出来umask的作用了吧!
 
