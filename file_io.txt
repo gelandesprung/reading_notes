@@ -157,4 +157,93 @@ void sync(void);
 </code>
 sync没有参数它就是通知系统把缓冲区的数据更新一下，并不等更新开始就返回了。所以一般在demo程序中隔断时间调用一下。一般是30s。 \\
 fsync则是针对某一个文件通知系统更新缓冲的数据，并且要等更新完成才返回。fdatasync与fsync相似，不同的时fdatasync不要求系统更新文件属性，只要把数据块写回硬盘就中((Mac OS,FreeBSD不支持这个函数))
+====fcntl====
+fcntl的函数原型是：
+<code c>
+#include <fcntl.h>
+int fcntl(int filedes,int cmd, .../*int value*/);
+</code>
+返回值如若不是-1就表示成功，因为不同的cmd返回值有不同的意思。cmd可以分成5组
+  * F_DUPFD这个和dup2和dup有相互转换的关系，可以替代它们
+  * F_GETFD/F_SETFD get/set 操作process entry里的那个属性值，file descripter flag目前只有一个值，FD_CLOEXEC
+  * F_GETFL/F_SETFL 这个是操作file table的status flag。有效的值有O_RDONLY O_WRONLY O_RDWR O_APPEND O_NONBLOCK O_SYNC O_RSYNC O_DSYNC O_FSYNC O_ASYCN由于access mode的值是0 1 2所以要界定可读可写还是读写模式需要借助O_ACCMODE这个掩码
+  * F_GETOWN/SETOWN 这一组是操作当前接收SIGIO和SIGURG信号的进程ID和组ID的.
+  *F_GETLK/SETLK/SETLKW这三个选项后面会说到，它的第三个参数不再是int，而是一个指针。
+F_DUPFD上面的例子讲过了，F_GETFD/F_SETFD只有一个参数可以选择而且是以后讲，所以最精彩的就是F_GETFL/F_SETFL了，这里有一个例子：
+<code c>
+#include <unistd.h>
+#include <sys/types.h>
+#include <fcntl.h>
+int
+main (int argc, char *argv[])
+{
+  int flags;
+  if (argc != 2)
+    printf ("we need two arguments\n");
+
+  if ((flags = fcntl (atoi (argv[1]), F_GETFL)) == -1)
+    {
+      printf (" get file status flag fail.\n");
+    }
+  switch (flags & O_ACCMODE)
+    {
+    case O_RDONLY:
+      printf ("read only\n");
+      break;
+    case O_WRONLY:
+      printf ("write only\n");
+      break;
+    case O_RDWR:
+      printf ("read write \n");
+      break;
+    default:
+      printf ("access error \n");
+      exit (127);
+
+    }
+  if (flags & O_APPEND)
+    {
+      printf ("append.\n");
+    }
+  if (flags & O_NONBLOCK)
+    {
+      printf ("non block .\n");
+    }
+#ifdef O_SYNC
+  if (flags & O_SYNC)
+    {
+      printf ("sync.\n");
+    }
+#endif
+  if (flags & O_RSYNC)
+    {
+      printf ("read after write--- rsync.\n");
+    }
+  if (flags & O_DSYNC)
+    {
+      printf ("write wait data sync only -- dsync.\n");
+    }
+  return 0;
+}
+</code>
+编译之后的用法是：
+<code bash>
+./a.out 0 </dev/tty
+./a.out 5 5<>tmp.foo
+....
+</code>
+前面就提到过写入并没有立刻执行，而是被内核缓存起来了，
+当文件打开之后我们只剩下一个描述符，况且文件名到处传递也不方便，所以需要修改文件的状态信息的时候就只剩下fcntl可以使用了，很方便！
+==== ioctl ====
+ioctl的函数原型是：
+<code>
+#include <sys/ioctl.h>
+int ioctl(int filedes,int request,...);
+</code>
+返回-1表示出错，其它表示成功。在处理设备时候碰到说不清道不明的功能时就会把它放到ioctl函数中实现，所以造成这个函数的功能谁也说不明了，也解释不清楚，总之脏活累活找它就对了，都是泪啊，后面会一一道来，先看看到底有多复杂吧
+  * disk labels中定义了6个功能以DIOxxx表示请求，<sys/disklabel.h>
+  * 处理文件的功能有9个定义在<sys/filio.h>,以FIOxxx表示请求
+  * mag tape I/O MTIOxxx定义在<sys/mtio.h>有11个功能
+  * socket I/O竟然有60个，定义在<sys/sockio.h>以SIOxxx表示请求
+  * terminal I/O也不少，有44个，定义在<sys/ttycom.h>中
 
