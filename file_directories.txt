@@ -1,0 +1,25 @@
+=====file & directories=====
+====stat fstat lstat====
+先看函数定义：
+<code c>
+#include <sys/stat.h>
+int stat(const char* restrict pathname,struct stat* restrict buf);
+int fstat(int filedes,struct stat* buf);
+int lstat(const char* restrict pathname,struct stat* restrict buf);
+</code>
+返回0正常，返回-1错误。 \\
+给我一个文件，返回给你文件的stat数据结构，fstat针对已经打开的文件，使用文件的描述符。lstat和stat参数是一样的，不同点就是如果文件是一个链接lstat不跟踪链接返回的是连接的stat结构，stat返回的是链接到的文件的stat结构。
+====文件类型====
+一般情况下文件就可以分为普通文件和目录，不过随着系统的发展，出现了不少新东西也归结到文件这中，所以文件类型就比较多了。struct stat的第一项就是mode_t st_mode；我们来看看到现在为止有多少文件类型：
+  -普通文件
+  -目录
+  -链接文件
+  -块文件
+  -字符文件
+  -socket文件
+  -FIFO或者叫管道文件
+unix中甚至允许进程间通讯使用的message quene semaphores share memory这些东西作为文件，并且定义了判断它们的方法。 \\
+判断文件的类型有两种方法，一种是使用<sys/stat.h>中定义的宏S_ISREG S_ISDIR S_ISBLK S_ISCHR S_ISSOCK S_ISLNK S_ISFIFO。另一种方法是比较st_mode&S_IFMT与S_IFXXX的值，这也是S_ISXXX实现的过程，主要是因为有些老旧的系统没有添加这些宏，我们代码中就要麻烦一点啦！这两种方法都不能判断IPC对象的类型，它们有特殊的宏来判断，S_TYPEISMQ() S_TYPEISSEM() S_TYPEISSHM()这三个宏不使用stat.st_mode作为参数，而是使用&stat，也就是struct stat结构指针作为参数。 \\
+说完了这些来总结一下：判断文件的类型首先要调用stat fstat lstat三个中的一个取得struct stat结构，然后使用S_ISREG S_ISDIR S_ISBLK S_ISCHR S_ISSOCK S_ISLNK S_ISFIFO S_TYPEISMQ() S_TYPEISSEM() S_TYPEISSHM()这十个宏就可以判断文件的类型了，如果前七个宏不存在，需要使用st_mode&S_IFMT的值与S_IFXXX比较。
+
+
