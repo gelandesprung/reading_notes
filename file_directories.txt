@@ -102,4 +102,57 @@ main ()
 --wx-wx-wx 1 yanchao yanchao    0 Dec 24 15:40 foo2
 </code>
 从例子和结果能看出来umask的作用了吧!
+====chmod & fchmod====
+先看函数原型:
+<code c>
+#include<sys/stat.h>
+int chmod(const char* filepath,int mode);
+int fchmod(int filedes,int mode);
+</code>
+返回0表示成功，-1表示失败 \\
+为mode定义的变量有好多个，总结起来就是创建文件使用的那些变量再添加S_ISUID S_ISGID S_ISVTX S_IRWXU S_IRWXG S_IRWXO.
+====sticky bit====
+历史原因，在unix中可执行文件可以一个标志位sticky bit，在第一次被加载到系统中执行时它的txt部分代码被缓存到swap中，以便下次再执行些文件时快速加载。后来演变到在st_mode中有一们这个标志，但也只能superuser添加，而linux普通用户也有权限添加这一位，不过就是加了也没有用。再后来目录也可以添加这一位，它的功能就扩展了，如果某一目录设置了sticky bit只要对这个目录拥有写权限的前提下，你拥用该目录下的文件，你就可以删除这个文件或者重命名它，拥有这个目录你就直接可以删除目录了，或者是超级用户，那啥都能干了。它的好处是该目录所有用户都可以创建删除修改文件，但不能改变别人的文件。
+====chown fchown lchown====
+函数原型：
+<code c>
+#include <unistd.h>
+int chown(const char* pathname,uid_t owner,gid_t group);
+int fchown(int filedes,uid_t owner,gid_t group);
+int lchown(const char* pathname , uid_t owner,gid_t group);
+</code>
+返回0表示成功，－1失败 \\
+owner group的值都可以为-1，表示表示不做修改。有些系统只有superuser才能调用该功能，并且chown之后suid sgid位都会被清除掉。大部分系统不允许修改uid，但是可以修改gid，不过gid的取值必须是你所在的组，一个用户可以加入14个或者更多的组。
+====文件的大小====
+在struct stat结构中st_size表示文件的大小，st_blksize表示标准I/O使用的缓冲区大小，st_blocks以512byte为单位，表示文件占用了多少块，如果系统的块大小不是512就悲剧了，st_blocks的意义就不能表示块数了，所以它是不可移植的。
+====truncate====
+在open中打开文件有一个参数O_TRUNC,打开文件的时候顺便把文件清空，其它还有两个类似功能的函数
+<code c>
+#incluce <unistd.h>
+int truncate(const char* path,off_t lenght);
+int ftruncate(int filedes,off_t length);
+</code>
+返回0表示成功，-1表示错误 \\
+这俩个函数并不一定要把文件清空，除非length=0，如果文件大小length，文件大于length的部分就不可见，如果文件小于length，系统的实现就不一样的了，有的无任何动作，有的把文件硬扩到那么大就是添加个hole。
+====文件系统====
+咱们把文件系统简单化成只有两种结构一个是i-node，另一个是directory entry。一个文件系统的起点就是那个根目录/它是一个directory entry，directory entry中有很多键值对，每一对对应着一个文件或者是目录，这个键值对就是directory entry结构的成员i-node号和文件名，i-node号指向i-node块，文件名就是i-node块定义的文件的文件名。然后整个文件系统就组织起来了。
+<note>这只是我粗浅的理解</note>
+====link unlink====
+这两个函数一个是创建一个链接文件，一个是删除一个链接文件。函数原型是:
+<code c>
+#include <unistd.h>
+int link(const char* exitingpath,const char* new path);
+int unlink (const char* path);
+</code>
+link在创建链接的时候只负责最后那个文件名的创建，路径中的目录必须都是存在的，并且进程的user id必须要有可执行权限且最后一级目录要有写权限，因为创建一个链接就是修改最后一级的目录添加一个diretctory entry到data block。
+unlink只需要把st_nlink值减一，如果变成了零就看看还有没有进程打开这个文件，如果没有就会被删除掉。如果还有进程打开这个文件，等进程关闭时内核也会检查该文件的引用值是否为0，是否还有进程打开它，如果都是0，文件会被删除。
+====remove rename====
+<code c>
+#include<stdio.h>
+int remove(const char* filepath);
+int rename(const char* oldname,const char* newname);
+</code>
+执行成功返回0，错误返回－1 \\
+remove的参数是文件是相当于unlink，参数是目录时相当于rmdir。 \\
+rename的情况复杂一些，首先是进程在新旧路径下都要有exe权限，且文件的父目录要有写权限。如果rename的是文件，newname存在。只有在newname也是文件时才会删除rename并执行rename，如果newname是目录，且newname存在，必须要newname是目录，且是空的才可以删除newname目录执行rename。如果是link，重命名的只是链接文件，目标文件无变化。
 
