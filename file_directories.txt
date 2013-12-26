@@ -155,4 +155,117 @@ int rename(const char* oldname,const char* newname);
 执行成功返回0，错误返回－1 \\
 remove的参数是文件是相当于unlink，参数是目录时相当于rmdir。 \\
 rename的情况复杂一些，首先是进程在新旧路径下都要有exe权限，且文件的父目录要有写权限。如果rename的是文件，newname存在。只有在newname也是文件时才会删除rename并执行rename，如果newname是目录，且newname存在，必须要newname是目录，且是空的才可以删除newname目录执行rename。如果是link，重命名的只是链接文件，目标文件无变化。
+====symlink readlink====
+软链接的函数：
+<code c>
+#include <unistd.h>
+int symlink(const char* exitingpath,const char* newpath);
+ssize_t readlink(const char* restrict pathname,char* restrict buf,size_t bufsize);
+</code>
+对于symlink函数创建一个软链接，成功返回零，失败返回负一.  \\
+对于readlink读取软链接的内容，返回读取到的字节数，如果为-1表示读取失败。
+====File time====
+有三个时间，st_atime((access time)) st_mtime((modification time)) st_ctime((change time,与i-node相关)) \\
+主要区分的是st_mtime和st_ctime。st_mtime是指修改了文件数据块，st_ctime是指修改了文件的i-node块，如chmod fchmod chown 这些都只会修改i-node块所以影响的也仅仅是st_ctime。
+====utime====
+<code c>
+#include<utime.h>
+int utime(const char* file,const struct utimbuf * times);
+struct utimbuf{
+time_t actime;
+time_t modtime;
+};
+</code>
+成功返回0，失败返回-1 \\
+如果tiems的值是null，设置成当前时间，这个函数只可以改变st_atime和st_mtime，而且它会自动更新st_ctime。
+====mkdir rmdir====
+<code c>
+#include<sys/stat.h>
+int mkdir(const char* path,int mode);
+</code>
+创建成功返回0,失败返回-1
+<code c>
+#include<unistd.h>
+int rmdir(const char* path);
+</code>
+成功返回0，失败返回-1.目录必须为空才能删除.
+====目录的操作====
+先打开目录：
+<code c>
+#incluce <dirent.h>
+DIR* opendir(const char* path);
+</code>
+返回一个DIR结构，返回空表示出错了。
+<code c>
+#include <dirent.h>
+struct dirent* readdir(DIR* dp);
+</code>
+成功返回一个指向dirent结构的指针，返回NULL表示结束或者出错了。
+<code c>
+#include<dirent.h>
+void rewinddir(DIR* dp);
+</code>
+把指针指向DIR结构的开始,也就是重置的功能。
+<code c>
+#include<dirent.h>
+int closedir(DIR* dp);
+</code>
+关闭打开的目录，成功返回0，失败-1
+<code c>
+#include<dirent.h>
+long telldir(DIR* dp);
+void seekdir(DIR* dp,long loc);
+</code>
+他们配合使用，可以跳过一些entry
+我们来搞一个例子练习一下这些函数，功能就是ls一个目录。
+<code c>
+#include<dirent.h>
+#include<sys/stat.h>
+#include<unistd.h>
+#include<sys/types.h>
 
+void
+listdir (const char *path)
+{
+  struct stat mstat;
+  struct DIR *mpdir;
+  struct dirent *mpdirent;
+//check path is a directory
+  if (lstat (path, &mstat) == -1)
+    printf ("path: %s may no exist.\n",path);
+  if (!S_ISDIR (mstat.st_mode))
+    {
+      printf ("%s is no a directory. exit\n", path);
+      exit (127);
+    }
+  if ((mpdir = opendir (path)) == NULL)
+    printf ("open dir %s fail.\n", path);
+  while ((mpdirent = readdir (mpdir)) != NULL)
+    {
+      printf ("%s \n", mpdirent->d_name);
+    }
+  close (mpdir);
+}
+
+int
+main (int argc, char *argv[])
+{
+  if (argc != 2)
+    return -1;
+  listdir (argv[1]);
+  return 0;
+</code>
+==== chdir lchdir ====
+<code c>
+#include<unistd.h>
+int chdir(const char* path);
+int fchdir(int filedes);
+</code>
+成功返回0,失败返回-1 \\
+内核管理当前工作目录的方式比较简单，它直接指向当前目录的v-node，所以向上返回的时候比较麻烦了，必须使用..多次，不过有一个函数要吧直接获取绝对路径。
+<code c>
+#include<unistd.h>
+char＊ getcwd(char* buf,size_t length);
+</code>
+返回非空就表示成功，如果是NULL就错了。 \\
+<<end>>
