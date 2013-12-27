@@ -1,0 +1,73 @@
+======标准输入输出======
+=====打开文件=====
+标准输入输出打开文件有三个方法，返回的就是一结构体指针叫FILE*，
+<code c>
+#include<stdio.h>
+FILE* fopen(const char* restrict fileName,int mode);
+FILE* freopen(const char8 restarict fileName,int mode,FILE* fp);
+FILE* fdopen(int filedes,int mode);
+</code>
+正确的返回是一个FILE指针，错误则是直接返回NULL. \\
+fopen这个函数是最常用的，中规中矩，不过mode的值真是让人头痛，"r"是只读倒是好理解，"w"的意思变成了O_WRONLY|O_TRUNC|O_CREAT，"a"的意思变成了O_WRONLY|O_APPEND|O_CREAT，"r+"的意思好理解一点O_RDWR，"w+"的意思是O_RDWR|O_CREAT|O_TRUNC，"a+"的意思是O_RDWR|O_APPEND|O_CREAT。复杂吧，感觉还好乱，我研究了一下，发现了一点规律：
+  * 带＋号表示O_RDWR
+  * 有w就是O_TRUNC
+  * 有a就是O_APPEND
+  * 除了r都有O_CREAT，这也好理解，文件都不存在读个屁呀
+最后二进制的文件读取时要加个b。\\
+freopen这个函数我折腾了一圈，根据我现在的发解，它的功能主要是测试时重定向输入，以及日志的输出。fdopen这个函数的地盘是socket以及管道，因为标准输入输出不能打开这些文件。so!
+=====缓冲区=====
+标准输入输出函数的特点就是有缓冲区，所以它的缓冲区也有专门的操作函数：
+<code c>
+#include <stdio.h>
+int setbuf(FILE* restrict fp,char * restruct  buf);
+int setvbuf(FILE* restrict fp,char * restrict buf,int mode, size_t size,);
+</code>
+可以自己定义一个缓冲区，大小必须是BUFSIZ，用setbuf设置一下，如果buf的值为NULL,表示关闭缓冲区。\\
+=====标准文件操作=====
+文件的读取有三种情况，第一种是一次读取一个字符：character-at-a-time I/O,第二种是一次读取一行line-at-a-time I/O，第三种是Direct I/O，这是一次读取一个结构体之类的。
+====character-at-a-time====
+从stream中读取一个字符有三个函数，确切的说是两个函数，因为getc(FILE* fp)是一个宏。
+<code c>
+#include<stdio.h>
+int getc(FILE* fp);
+int fgetc(FILE* fp);
+int getchar(void);
+</code>
+第一个getc是宏的形式实现的，使用的时候得注意，不能把它的返回当个值引用。第二个是函数没有这方面的问题，但是速度比第一个慢一些。第三个是从stdin读取一个字符，相当于fgetc(stdin)。 \\
+这几个函数的返回值情况是一样的，如果返回的是个字符表示成功了，返回的是EOF就分情况了，可能是文件结束了，还有可能是出错了，所以我们有两个函数专门做这个事情。
+====ferror feof====
+<code c>
+#include<stdio.h>
+int ferror(FILE* fp);
+int feof(FILE* fp);
+</code>
+如果我们读取文件的时候得到了EOF，需要调用feof，返回值非0表示没有出错，文件读取结束了。这两个函数返回值非零都表示条件为真。这两个函数判断的依据并不是errno的值，而是FILE结构维护着两个flag--error flag & end-of-file flag。
+====ungetc====
+<code c>
+#include<stdio.h>
+int ungetc(int c,FILE* fp);
+</code>
+我们在读取文件数据的时候，某种原因读取多了，可以使用这个函数把读取的送回去，有一点需要说明的是送回去的字符不一定就要是你读取到的字符，随便你读取什么都行，反正再次fgetc的时候返回ungetc的那个字符，有的系统不支持这个函数，那就需要我们把多读取的字符自己存起来，再次再读的时候先处理上次多读的字符。不能ungetc的字符只有EOF，退回的字符并没有被写到设备中去，而是保存在FILE结构维护的buffer中。
+====输出字符====
+<code c>
+#include<stdio.h>
+int putc(int c ,FILE* fp);
+int fputc(int c,FILE* fp);
+int putchar(int c);
+</code>
+和getc fgetc getchar一样,putc是宏，putchar(int c)相当于fputc(int c,stdin).
+====fgets & gets====
+<code c>
+#include <stdio.h>
+int fgets(char* restrict buf,int n,FILE* restrict fp);
+int gets(char* buf);
+</code>
+返回NULL表示结束或者出错。gets是从stdin是取字符，虽然给了个缓冲区，但是输入多了会溢出而不报错。
+====fputs & puts====
+<code c>
+#include<stdio.h>
+int fputs(const char* restrict buf,FILE* restrict fp);
+int puts(const char* str);
+</code>
+fputs输出一个null结束的字符串，null不输出，puts再多输出一个new-line。
+
