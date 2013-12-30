@@ -70,4 +70,50 @@ int fputs(const char* restrict buf,FILE* restrict fp);
 int puts(const char* str);
 </code>
 fputs输出一个null结束的字符串，null不输出，puts再多输出一个new-line。
+====printf fprintf sprintf====
+<code c>
+#include <stdio.h>
+int printf(const char *restrict format,...);
+int fprintf(FILE* restrict fp,const char* restrict format,...);
+int sprintf(char* restrict buf,const char* restrict format,...);
+int sprintf(char* restrict buf,size_t n,const char* restrict format,...);
+</code>
+这几个函数的返回值都是保存的字节数，值为负表示出错。 \\
+这个format有固定的格式：%[flag][fldwidth][precision][lenmodifier] convtype。flag fldwidth precision lenmodifier这几个是可选的，convtype是必选的。
+看看flag的种类：
+  * - 表示左对齐排列left-justify
+  * + 显示符号比如是负的
+  * (space)如果没有符号显示一个空格
+  * # 转换的一个备用选项，我想打印十六进制时如果不用%x 用%#0x也可以。
+  * 0 需要添加空格的地方用0替代。
+fldwidth这个选项是一个非负整数，是转换的时候数据的最小宽度，字符数不够的时候用空格补齐，主要做对齐使用。
+precision的意思是精度,是小数点后面的值，多的被截掉了。
+比如: \\
+<code c>
+#include<stdio.h>
+int
+main ()
+{
+  printf ("%05.1f\n", 1.24);
+  return 0;
+}
+</code>
+执行的结果是
+<code>
+$ ./a.out 
+001.2
+</code>
+lenmodifier的值有啥用呢？ \\
+convtype是必须的有
+  * d,i signed decimal
+  * o unsigned octal
+  * u unsigned decimal
+  * x,X unsigned hexadecimal
+  * f,F double floating-point number
+  * e,E double floating-point unmber in exponeential format
+  * g,G interpreted as f,F,e,or E, depending on value converted
+  * a,A double floating-point number in hexadecimal exponential format
+  * c character(with l length modifier,wide character)
+  * s string (width l length modifier, wide character string)
+还有几个有点重，不写了。
 
