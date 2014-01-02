@@ -1,0 +1,43 @@
+======signal======
+singanl简单的理解就是软中断，一种处理异步事件的方法
+=====signal的概念=====
+signal都有一个以SIG开头的名字，linux中大约支持31个signal，这些signal的值就是一个大于0的整数，signal产生的大致有以下几种：
+  * 终端产生的，contro-c产生一个SIGINT信号
+  * 硬件错误产生的中断，比如哪个数被0除了，访问内存过界啦之类的。
+  * 通过kill函数可以向指定的进程产生任何各类的signal，当然也有一些限制，当前进程要么是super user或者是与被操作进程属于相同的用户。
+  * 通过kill命令也可以产生signal到某一个进程，
+  * 软件在某些条件下也会产生signal通知进程什么事情发生了之类的应用场景
+signal是一种很精典的异步事件处理方式，不需要查询某个变量以确定事件是否发生，而是告诉kernel某件事情发生时怎么做，做的方式有三个选择，第一个是忽略，第二个是捕捉到，便按默认处理，一般对信号的默认处理就是结束进程，第三个也是捕捉到信号，并按指定的函数来处理信号。有两个信号我们无法捕捉也无法忽略，它们是SIGKILL SIGSTOP，这两个信号是对付进程的杀手锏，要不然进程就无法无天了。挑向个我觉得常用的signal记录一下。
+SIGABRT 这是由abort函数产生的信号量，进程收到这个信号量会非正常死亡
+SIGALRM 这个是调用alarm()产生的信号，setitimer也可以触发这个信号
+SIGCHLD 当子进程结束或者停止时产生SIGCHLD信号，传递给父进程，如果想知道子进程的状态变化就要捕捉这个信号，因为它的默认处理是忽略，一般的处理方式是wait或者waitpid得到结束子进程的ID和结束状态。
+SIGCONT 这是一个job-control信号，发送给停止的进程，让进程继续工作，如果进程正在工作，些信号被忽略。
+SIGFPE 前面提到的被零出就是产生SIGFPE信号，从名子上我们可以推测去这是浮点数运算出问题时产生的信号，所以当浮点数溢出时也产生这个信号。
+SIGINT 当我们在终端输入DELETE或者CTRL＋C时产生的信号，发送到所以在前台运行的进程，通常被进来结束正在运行的进程，虽然会打印出很多意想不到的字符串。
+SIGIO 这是一个异步IO事件，在linux中等同于SGIPOLL，默认的处理方式是结束进程。
+SIGKILL 给超级用户提供了一种杀死所有进程的手段。
+SIGPIPE 当我们向管道写数据时，读的一端已经关闭了，就会产生SIGPIPE这个信号，
+SIGPOLL 前面提到SIGIO的值等同于它，在一个可轮询的设备上，特殊事件发生时会产生这个信号，具体没有解释，后面poll的时候会仔细说。
+SIGPROF setitimer会触发这个信号，setitimer还会触发SIGALRM信号
+SIGPWR 当硬件断电时产生，然后作用UPS电源供电，如果UPS电源的电量也不足时会再次产生这个信号，然后系统就要关机了。
+SIGQUIT terminal driver产生的信号，产生的方式是按ctrl+\，它的功能和SIGINT一样杀死所有前台程序，不一样的是还产生core文件。
+SIGSEGV 内存越界访问时产生的信号
+SIGSTKFLT 栈溢出时产生的信号，协处理器的栈
+SIGSTOP job-control signal 与SIGCONT对应它让进程停下来。
+SIGSYS 当我们的代码中使用错误的系统调用时产生SIGSYS信号，主要的原因是代码使用新系统提供的接口，运行在旧系统上，才会产生这个信号SIGSYS
+SIGTERM 发给进程，让进程体面的结束，效果和SIGKILL一样，区别是它可以被捕捉，而SIGKILL不可以被捕捉。所以体面一些，允许进程做一些清除工作。
+SIGTSTP 这是一个交互的停止信号，由control-z产生，发送给所有前台进程
+SIGURG 紧急情况下产生的，比如socket的外带数据。
+SIGUSR1 SIGUSR2 这两个信号没有定义具体的意思留给用户使用。
+SIGVTALRM 还是由setitimer触发的，这个函数还挺牛它还触发了SIGALRM SIGCONF
+SIGWINCH 某一进程通过ioctl修改窗口个数值的时候，前台每个进程那会收到SIGWINCH信号量。
+SIGXCPU 进程耗尽了自己的CPU时间时收到的通知单.
+SIGXFSZ 由于进程资源的限制，创建太多的文件会收到这个通知，linux的做法是结束进程并产生一个core文件。
+=====signal函数=====
+<code c>
+#include<signal.h>
+void (*signal(int signo,void(*func)(int)))(int);
+</code>
+它返回的是一个函数指针，原型是void (*func)(int); \\
+signal的忽略函数是SIG_IGN,默认处理函数是SIG_DEF，错误值是SIG_ERR.
+
