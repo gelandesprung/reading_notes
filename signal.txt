@@ -74,4 +74,83 @@ kill函数的pid值还是有讲究的，如果pid的值大于0，那就没有啥
 int pause(void);
 </code>
 return -1 with errno set to EINTR \\
+=====sigprocmask=====
+<code c>
+#include<signal.h>
+int sigprocmask(int how,const sigset_t* restrict set,sigset_t* restrict oset);
+</code>
+returns: 0 if OK,-1 on error \\
+how的可选值有三个
+  * SIG_BLOCK 
+  * SIG_UNBLOCK
+  * SIG_SETMASK
+如果set的值为空，how的值就被忽略，也就是说set和how是一体的，它们都存在时才有作用。如果oset的值不为空，则oset的值就是当前进程的信号屏蔽值。如果set的值非空，how决定set的值如何用。比如SIG_BLOCK和SIG_UNBLOCK就是追加的意思，而SIG_SETMASK就是替换！ \\
+<code c>
+#include<signal.h>
+int sigpending(sigset_t *set);
+</code>
+returns: 0 if OK, -1 on error \\
+返回当前正在被阻塞等待传输的信号组。
+<code c>
+#include<signal.h>
+#include<stdio.h>
+#include<unistd.h>
+#include<stdlib.h>
+
+void
+mytest (int signo)
+{
+  printf ("x\n");
+}
+
+int
+main ()
+{
+  sigset_t set, oset;
+
+  signal (SIGALRM, mytest);
+  sigemptyset (&set);
+  sigemptyset (&oset);
+  sigaddset (&set, SIGALRM);
+  if (sigprocmask (SIG_BLOCK, &set, &oset) == -1)
+    {
+      perror ("sigprocmask");
+      return -1;
+    }
+  printf ("pid=%d\n", getpid ());
+  alarm (1);
+  sleep (10);
+  sigemptyset (&set);
+  if (!sigpending (&set))
+    {
+      if (sigismember (&set, SIGALRM))
+	{
+	  printf ("siguser1\n");
+	}
+    }
+  if (sigprocmask (SIG_SETMASK, &oset, NULL) == -1)
+    {
+      perror ("sigprocmask");
+      return -1;
+    }
+  printf ("end\n");
+  return 0;
+}
+</code>
+=====sigaction=====
+<code c>
+#include<signal.h>
+int sigaction(int signo,const struct sigaction* restrict act,struct sigaction* restrict oact);
+</code>
+retuns: 0 if OK, -1 on erron \\
+这个函数与sigprocmask的结构是一样的，signo和act是一组，如果act非空，与signo配合使用！如果oact非空，oact保留设置之前的act值，act、oact一进一出！ \\
+<code c>
+struct sigaction{
+void (*sa_handler)(int);
+sigset_t sa_mask;
+int sa_flags;
+void (*sa_sigaction)(int,siginfo_t*,void*);
+}
+</code>
+如果指定了sa_handler，首先把sa_mask追加到当前进程的屏蔽信号列表，并且sa_handler在添加屏蔽信号之后。这个两个值配合起来可以完成一个重要的任务，保证信号的可信性，sa_mask的值是在sa_handler被调用之前添加到进程的信号mask中，等到sa_handler退出的时候从mask中清除提sa_mask指定的信号集，比如我给alarm添加一个处理函数，并且在处理之前把alarm添加到屏蔽mask中，在我们执行alarm的时候不会再收到SIGALRM信号了，这样一来信号就不会丢失！ \\
 
