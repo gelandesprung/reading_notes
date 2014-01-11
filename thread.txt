@@ -117,4 +117,41 @@ int pthread_attr_setstacksize(pthread_attr_t* attr,size_t stacksize);
 int pthread_attr_getguardsize(const pthread_attr_t* restrict attr,size_t* restrict guardsize);
 int pthread_attr_setguardsize(pthread_attr_t* attr,size_t guardsize);
 </code>
-
+=====pthread_mutexattr_t=====
+这个是mutex的属性，我们只关心它的三个属性：
+  * process-share
+  * robust
+  * type
+和pthread_attr_t的初始化一样，它也提供两个函数实现初始化和销毁
+<code c>
+int pthread_mutexattr_init(pthread_mutexattr_t* attr);
+int pthread_mutexattr_destroy(pthread_mutexattr_t* attr);
+</code>
+mutex不但可以用于一个进程的所有线程间，还可以用于进程间的。比如几个进程共用一块内存地址，那么对这块地址的访问就需要进行同步，这个就是process-shared的功能，它有两个可选值，一个是默认值PTHREAD_PROCESS_PRIVATE,另一个是用于进程间的PTHREAD_PROCESS_SHARED。它的操作函数是：
+<code c>
+#include<pthread.h>
+int pthread_mutexattr_getpshared(const pthread_mutexattr_t* restrict attr,int* restrict pshared);
+int pthread_mutexattr_setpshared(pthread_mutexattr_t* attr,int pshared);
+</code>
+robust属性与process-shared关联，多个进程等待一个mutex的时候，如果持有mutex的进程死了，别的进程无法获取mutex，只能无限的等，robust就是为了解决这个问题而生的。robust的值有两个一个是PTHREAD_MUTEX_STALLED,另一个是PTHREAD_MUTEX_ROBUST。如果设置成PTHREAD_MUTEX_STALLED,不只能一直等着了，如果设置成PTHREAD_MUTEX_ROBUST，就允许其它进程获取死掉进程持有的mutex，不过返回的值不是0，而EOWNERDEAD（拥有者死了）
+<code c>
+#include<pthread.h>
+int pthread_mutexattr_getrobust(const pthread_mutexattr_t* restrict attr,int* restrict robust);
+int pthread_mutexattr_setrobust(pthread_mutexattr_t* attr,int robust);
+</code>
+有时候unlock一个mutex不一定就会成功，如果不成功下面就没有办法用了，作为一个解决方案，我们可以在调用pthread_mutex_unlock(pthread_mutex_t* restrict mutext)之前先调用一下pthread_mutex_consistent(pthead_mutex_t* mutex);
+<code c>
+#include <pthread.h>
+int pthread_mutex_consistent(pthread_mutex_t* mutex);
+</code>
+前面提到的两个属性是用于进程间同步的，下面这个type通用的，mutex通过type可以指定不一样的表现形式，
+  * PTHREAD_MUTEX_NORMAL
+  * PTHREAD_MUTEX_ERRORCHECK
+  * PTHREAD_MUTEX_RECURSIVE
+  * PTHREAD_MUTEX_DEFAULT
+前面三个各有特点，后一个被指向前两个中的一个。PTHREAD_MUTEX_NORMAL不进行错误检查，如果你还没有unlock你又lock直接deadlock，一个线程锁定mutex，另一个线程unlock结果就是undefined,unlock一个unlocked的mutex结果也是undefined,如果mutex的type是PTHREAD_MUTEX_ERRORCHECK这几种情况都不会出那么大的问题，它会返回error，这给我们纠正留下了可能。PTHREAD_MUTEX_RECURSIVE比较特别，它的表现和PTHREAD_MUTEX_ERRORCHECK基本一样，只不过它可以lock一个locked的mutex，所以人家叫递归。它的作用就是用于那些只能单线程执行的函数。
+<code c>
+#include <pthread.h>
+int pthread_mutexattr_gettype(const pthread_mutexattr_t* restrict attr,int* restrict type);
+int pthread_mutexattr_settype(pthread_mutexattr_t* attr,int type);
+</code>
