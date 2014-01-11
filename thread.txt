@@ -78,3 +78,43 @@ int pthread_spin_unlock(pthread_spinlock_t *lock);
 =====barriers=====
 barriers也是一个用于线程同步的工具，主要的用处是让多个线程并行运行.举个简单的例子吧，我们把一项工作分成8份，用八个线程去完成，等这八个线程都完成之后我们再把结果取出来做个总结，实现方法就是pthread_barrier_init，等待的线程数可以设置成9，这样可以把主线程也看成一个线程，其它线程干完活就退出了只有主线程后面还有代码可以执行，所以总结由主线程来做。八个线程在执行完成之后都pthread_barrier_wait等待其它的线程执行完成。
 
+======thread control======
+昨天本来已经把pthread_attr_t的属性写完了，但是可能是没有保存成功，总之是没有了，只能重新写的。
+=====pthread_attr_t=====
+调用pthread_create的时候第二个参数是指向pthread_attr_t结构的指针，设定我们创建的线程有哪些特性，我们能够改变的特性也不是很多，有四个：
+  * detachstate
+  * stackaddr
+  * stacksize
+  * guardsize
+有一组函数创建和销毁pthread_attr_t对象
+<code c>
+#include<pthread.h>
+int pthread_attr_init(pthread_attr_t* attr);
+int pthread_attr_destroy(pthread_attr_t* attr);
+</code>
+线程执行完之后有一个返回状态，有时候我们会关心它，默认我们是关心这个状态的，但也有些时候我们根本不关心它返回什么状态，在创建线程的时候我们就可以明确的告诉系统，我不关心这个线程的返回状态，于是用到了detachstate的值，它有两个值，PTHREAD_CREATE_DETACHSTATED和PTHREAD_CREATE_JOINABLE;但是我们不能直接用等号赋值，有两个函数可以使用
+<code c>
+#include<pthread.h>
+int pthread_attr_getdetachstate(const pthread_attr_t * restrict attr,int * detachstate);
+int pthread_attr_setdetachstate(pthread_attr_t* attr,int detachstate);
+</code>
+我们再来看看线程的栈，默认的办法是使用进程的栈，一个线程一块，只是这个空间有限，不一定够分。还有一个办法就是自己从堆上分配一块空间作为线程的栈，这就用到了线程的第二个属性：stackaddr。也有两个函数对这个属性存取
+<code c>
+#include <pthread.h>
+int pthread_attr_getstack(const pthread_attr_t* restrict attr,void** restrict stackaddr,size_t* restrict stacksize);
+int pthread_attr_setstack(pthread_attr_t* attr,void* stackaddr,size_t stacksize);
+</code>
+由于机器体系结构的不同，malloc可能返回申请内存的最低地址，也可能返回最高地址，但是这里只能是最低地址值，虽然书上没有说，不过我想自己申请的内存还得自己释放吧！ \\
+有些时候我们需要的栈不是很大，但是比较默认就大了那么一点，那就不需要自己申请内存作为线程的栈，只需要把栈的默认配置值调大一点就行了，如果你觉得线程默认的栈大小太大，简直是浪费，也可以把它调也，但是不能小于最小值。
+<code c>
+#include <pthread.h>
+int pthread_attr_getstacksize(const pthread_attr_t* restrict attr,size_t* restrict stacksize);
+int pthread_attr_setstacksize(pthread_attr_t* attr,size_t stacksize);
+</code>
+在不需要自己管理栈空间，也就不调协stackaddr的时候还有一个值guardsize为栈提供一个缓冲区，不至于溢出。它的大小通常是系统中一页的大小。就是在创建线程的时候，在栈的后面再留一页大小的空间，防止栈溢出！
+<code c>
+#include <pthread.h>
+int pthread_attr_getguardsize(const pthread_attr_t* restrict attr,size_t* restrict guardsize);
+int pthread_attr_setguardsize(pthread_attr_t* attr,size_t guardsize);
+</code>
+
