@@ -154,3 +154,41 @@ void (*sa_sigaction)(int,siginfo_t*,void*);
 </code>
 如果指定了sa_handler，首先把sa_mask追加到当前进程的屏蔽信号列表，并且sa_handler在添加屏蔽信号之后。这个两个值配合起来可以完成一个重要的任务，保证信号的可信性，sa_mask的值是在sa_handler被调用之前添加到进程的信号mask中，等到sa_handler退出的时候从mask中清除提sa_mask指定的信号集，比如我给alarm添加一个处理函数，并且在处理之前把alarm添加到屏蔽mask中，在我们执行alarm的时候不会再收到SIGALRM信号了，这样一来信号就不会丢失！ \\
 
+=====线程控制=====
+我们在创建线程的时候需要一个变量，类型是pthread_attr_t，当时我们是设置成空，没有管它，现在说说它。这个类型或者说结构有四个值，分别为创建的进程指定四个属性，
+  *第一个是detachstate
+  *第二个是stackaddr
+  *第三个是stacksize
+  *第四个是guardsize
+
+如果我们对于线程结束之后的状态信息不关心，可以选择在创建这个线程的时候就忽略它，这就需要在detachstate的用处，detachstate的状态值有两人上：
+  * PTHREAD_CREATE_DETACHED
+  * PTHREAD_CREATE_JOINABLE
+系统还为我们准备了两个函数来操作这两个值
+<code c>
+#include <pthread.h>
+int pthread_attr_getdetachstate(const pthread_attr_t * restrict attr,int* detachstate);
+int pthread_attr_setdetachstate(pthread_attr_t * attr,int detachstate);
+</code>
+每一个进程的栈大小也都会有个限制，所以线程的栈大小也要有修改的地方，这样才可能尽可能多的创建线程，而不浪费资源。stackaddr和stacksize是一起使用的，其实guardsize也可栈有关系。先看看栈的修改函数
+<code c>
+#include <pthread.h>
+int pthread_attr_getstack(const pthread_attr_t * restrict attr,void ** restrict addr,size_t * restrict size);
+int pthread_attr_setstack(pthread_attr_t * attr,void * stackaddr, size_t size);</code>
+有的栈是从高地址到低地址，有的是从低地址到高地址，这里不管这些，它需要的地址一定要是低地址。 \\
+上面说的是自己申请地址作为栈使用，还有一种办法是使用进程的栈，我们可以修改栈的大小，也有一组函数
+<code c>
+#include<pthread.h>
+int pthread_attr_getstacksize(const pthread_attr_t * restrict attr,size_t  * restrict  stacksize);
+int pthread_attr_setstacksize(pthread_attr_t* attr,size_t stacksize);
+</code>
+stacksize的值有一个限制就是不能小于PTHREAD_STACK_SIZE. \\
+现在说说guardsize的情况，只有在我们使用进程的栈时才会用到它，如果把它的值设为0，表示关闭这个功能，那么它的功能是什么呢，就是在栈后面留个缓冲区，免得举兴溢出，它的大小通常是系统中一页的大小，如果我们使用pthread_attr_setstack指定自己分配的空间作为线程的栈，那么这个选项默认是关闭的，系统认为你自己能处理好这个问题。它的操作函数是
+<code c>
+#include <pthread.h>
+int pthread_attr_getguardsize(const pthread_attr_t* restrict attr,size_t* restrict guardsize);
+int pthread_attr_setguardsize(pthread_attr_t* attr,size_t guardsize);
+</code>
+=====mutex的属性=====
+
+

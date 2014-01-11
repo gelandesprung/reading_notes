@@ -1,0 +1,80 @@
+======Thread======
+=====简介=====
+线程可以实现在一个进程中同时干几件事情！
+线程转进程有以下几种优势
+  *进程在实现事件处理的时候需要复杂的同步模式，而线程不需要，可以分出几个线程，每一个线程干针对一种事件
+  *进程共享资源比较复杂，而线程是共用的
+  *线程可以优化进程的效率，把无关的任务分离开，交叉执行，提高效率
+  *在与用户交互的进程中使用线程可以缩减响应时间
+线程也需要一个类型来识别它，pthread_t，为了可移植性，pthread_t被定义成一个结构，缺点就是我们在调试的时候无法打印它的值了，在linux中它被定义为unsigned long interger，也正是因为它是一个结构，还必须为经提供一个用于线程ID比较的函数
+<code c>
+#include<pthread.h>
+int pthread_equal(pthread_t tid1,pthread_t tid2);
+</code>
+返回非零表示相等，返回零表示不相同。 \\
+在线程内部可有一个方法获取自己的线程号：
+<code c>
+#include <pthread.h>
+pthread_t pthread_self(void);
+</code>
+=====线程的创建函数=====
+<code c>
+#include<pthread.h>
+int pthread_create(pthread_t *restrict tidp,const struct pthread_attr_t* restrict attr,void *(*	start_rtn)(void*),void* restrict arg);
+</code>
+返回0表示创建成功，否则就是错误号。
+
+=====线程的冲突解决=====
+<code c>
+#include<pthread.h>
+int pthread_mutex_init(pthread_mutex_t *restrict mutex,pthread_mutexattr_t *restrict attr);
+
+int pthread_mutex_destroy(pthread_mutex_t *mutex);
+
+int pthread_mutex_lock(pthread_mutex_t *mutex);
+
+int pthread_mutex_trylock(pthread_mutex_t *mutex);
+
+int pthread_mutex_unlock(pthread_mutex_t *mutex);
+
+</code>
+
+<code c>
+#include<pthread.h>
+int pthread_rwlock_int(pthread_rwlock_t * restrict lock,pthread_rwlockattr_t *restarict attr);
+int pthread_rwlock_destroy(pthread_rwlock_t * lock);
+int pthread_rwlock_rdlock(pthread_rwlock_t *lock);
+int pthread_rwlock_wrlock(pthread_rwlock_t *lock);
+int pthread_rwlock_unlock(pthread_rwlock_t *rwlock);
+</code>
+返回0表示成功 \\
+可以多个进程申请读锁，只能有一个进程申请写锁，申请写锁等等的时候读锁申请也会等待！ \\
+另有两个申请锁的方式
+<code c>
+#include<pthread.h>
+int pthread_rwlock_tryrdlock(pthread_rwlock_t *rwlock);
+int pthread_rwlock_trywrlock(pthread_rwlock_t *rwlock);
+</code>
+这两个函数不阻塞，如果申请失败就退出，返回值为EBUSY。成功就返回0，可以有效的避免死锁！ \\
+再来两个起时申请锁的函数，人家都有，咱也要
+<code c>
+#include <pthread.h>
+int pthread_rwlock_timedrdlock(pthread_rwlock_t *rwlock,const struct timepsec * restrict tsptr);
+int pthread_rwlock_timedwrlock(pthread_rwlock_t *rwlock,const struct timespec * restrict tsptr);
+</code>
+成功的返回0，超时返回ETIMEDOUT。还有一点要注意的是时间是绝对时间，不是那种几秒后超时，而是到几点为几分超时！
+=====condition variable=====
+这又是一种解决线程间同步的方法，使用pthread_cond_t这个数据类型描述它，我一直纠接于为什么要用condition,有mutex不就好了吗？可以用mutex保护一段代码，这段代码就是检查一个变量值，不是和condition的效果一样吗？写了一阵例子才明白过来，如果按我想的只能轮询，而用condition则可以睡眠，条件成熟再用pthread_cond_signal或者pthread_cond_broadcast唤醒其它等待condition的线程，为什么要用mutex与condition配合呢，主要是为了保证condition状态被修改时其它线程无法取这个状态值，因为这个时候取的值可能是错的。
+=====spin lock=====
+自旋锁与mutex相比是它不休眠，所以它锁定的时间一定要短，如果很长太浪费CPU了，这个功能比较适合在kernel中使用，因为中断的回调函数不能休眠，所以其它种类如mutex condition rwlock都不合适，因为它们不能lock的时候都会休眠！ \\
+<code c>
+#include <pthread.h>
+int pthread_spin_init(pthread_spinlock_t * lock,int pshared);
+int pthread_spin_destroy(pthread_spinlock_t *lock);
+int pthread_spin_lock(pthread_spinlock_t *lock);
+int pthread_spin_trylock(pthread_spinlock_t *lock);
+int pthread_spin_unlock(pthread_spinlock_t *lock);
+</code>
+=====barriers=====
+barriers也是一个用于线程同步的工具，主要的用处是让多个线程并行运行.举个简单的例子吧，我们把一项工作分成8份，用八个线程去完成，等这八个线程都完成之后我们再把结果取出来做个总结，实现方法就是pthread_barrier_init，等待的线程数可以设置成9，这样可以把主线程也看成一个线程，其它线程干完活就退出了只有主线程后面还有代码可以执行，所以总结由主线程来做。八个线程在执行完成之后都pthread_barrier_wait等待其它的线程执行完成。
+
